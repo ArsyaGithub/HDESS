@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-ESRGAN Web Upscaler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            text-align: center;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.02em;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        .main-content {
+            padding: 40px;
+        }
+        .upload-section {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95rem;
+        }
+        
+        select {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.2s ease;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23666" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 12px;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 16px;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            font-size: 16px;
+            background: #fafafa;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        input[type="file"]:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .model-info {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 8px;
+            padding: 12px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 24px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        .alert {
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .alert-success {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+        
+        .alert-error {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+        
+        .download-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .download-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+        .progress-container {
+            display: none;
+            margin: 24px 0;
+            padding: 24px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e2e8f0;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 20px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-weight: 600;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Comparison Preview Styles */
+        .comparison-container {
+            margin: 32px 0;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .comparison-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: -0.01em;
+        }
+
+        .comparison-wrapper {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        .comparison-images {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .image-base {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+            transition: clip-path 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-base img, .image-overlay img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            background: #fff;
+            transform-origin: center center;
+        }
+
+        .image-label {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            z-index: 2;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .original-label {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.9) 100%);
+        }
+
+        .enhanced-label {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%);
+            top: 16px;
+            right: 16px;
+            left: auto;
+        }
+
+        .comparison-divider {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: #fff;
+            transform: translateX(-50%);
+            z-index: 3;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+
+        .comparison-slider {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+            border: 3px solid #667eea;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: ew-resize;
+            z-index: 4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .comparison-slider:hover {
+            transform: translate(-50%, -50%) scale(1.15);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.3);
+        }
+
+        .comparison-slider::before {
+            content: '↔';
+            font-size: 18px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+
+        .comparison-controls {
+            padding: 24px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        .control-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 6px 8px 6px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .zoom-controls {
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .zoom-level {
+            font-weight: 700;
+            color: #374151;
+            font-size: 1rem;
+            min-width: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ AI Image Enhancer</h1>
+            <p>Transform your images with cutting-edge Real-ESRGAN technology</p>
+        </div>
+        
+        <div class="main-content">
+
+        {% if success %}
+        <div class="alert alert-success">
+            {{ success }}
+            {% if download_url %}
+            <br><a href="{{ download_url }}" class="download-link" download>📥 Download Result</a>
+            {% endif %}
+        </div>
+
+        <!-- Comparison Preview -->
+        {% if original_url and enhanced_url %}
+        <div class="comparison-container">
+            <div class="comparison-header">
+                🔍 Before & After Comparison
+            </div>
+            <div class="comparison-wrapper" id="comparison-wrapper">
+                <div class="comparison-images">
+                    <!-- Base layer: Original image (always visible) -->
+                    <div class="image-base">
+                        <div class="image-label original-label">Sebelum</div>
+                        <img src="{{ original_url }}" alt="Original Image" id="original-img">
+                    </div>
+                    <!-- Overlay layer: Enhanced image (clipped) -->
+                    <div class="image-overlay" id="enhanced-overlay">
+                        <div class="image-label enhanced-label">Sesudah</div>
+                        <img src="{{ enhanced_url }}" alt="Enhanced Image" id="enhanced-img">
+                    </div>
+                </div>
+                <div class="comparison-divider" id="comparison-divider"></div>
+                <div class="comparison-slider" id="comparison-slider"></div>
+            </div>
+            <div class="comparison-controls">
+                <button class="control-button" onclick="resetComparison()">↺ Reset</button>
+                <button class="control-button" onclick="showOriginal()">👁 Original</button>
+                <button class="control-button" onclick="showEnhanced()">✨ Enhanced</button>
+                <div class="zoom-controls">
+                    <button class="control-button" onclick="zoomOut()">🔍-</button>
+                    <span class="zoom-level" id="zoom-level">100%</span>
+                    <button class="control-button" onclick="zoomIn()">🔍+</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% if error %}
+        <div class="alert alert-error">
+            ❌ {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Progress Bar -->
+        <div class="progress-container" id="progress-container">
+            <div class="progress-text" id="progress-text">
+                <span class="spinner"></span>Processing image...
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" id="upload-form">
+            <div class="form-group">
+                <label for="model">🤖 Select AI Model:</label>
+                <select name="model" id="model" required>
+                    {% for model_key, model_info in models.items() %}
+                    <option value="{{ model_key }}" {% if selected_model == model_key %}selected{% endif %}>
+                        {{ model_info.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="model-info" id="model-description">
+                    {% if selected_model %}
+                        {{ models[selected_model].description }}
+                    {% else %}
+                        {{ models['RealESRGAN_x4plus'].description }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="file">📁 Select Image:</label>
+                <input type="file" name="file" id="file" accept="image/*" required>
+            </div>
+
+            <button type="submit" id="submit-btn" class="submit-btn">✨ Enhance Image</button>
+        </form>
+        </div>
+
+        <script>
+            // Update model description when selection changes
+            document.getElementById('model').addEventListener('change', function() {
+                const selectedModel = this.value;
+                const descriptionElement = document.getElementById('model-description');
+
+                // Model descriptions
+                const descriptions = {
+                    'RealESRGAN_x2plus': 'General purpose 2x upscaling model',
+                    'RealESRGAN_x4plus': 'General purpose 4x upscaling model',
+                    'RealESRGAN_x4plus_anime_6B': 'Optimized for anime and illustrations',
+                    'RealESRNet_x4plus': 'Clean upscaling without artifacts',
+                    'realesr-general-x4v3': 'Latest general model with denoise control'
+                };
+
+                descriptionElement.textContent = descriptions[selectedModel] || '';
+            });
+
+            // Progress bar functionality
+            document.getElementById('upload-form').addEventListener('submit', function(e) {
+                const progressContainer = document.getElementById('progress-container');
+                const progressFill = document.getElementById('progress-fill');
+                const progressText = document.getElementById('progress-text');
+                const submitBtn = document.getElementById('submit-btn');
+                const selectedModel = document.getElementById('model').value;
+
+                // Show progress bar
+                progressContainer.style.display = 'block';
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Processing...';
+
+                // Real-ESRGAN progress simulation (10-30 seconds depending on model)
+                let progress = 0;
+                let maxTime = selectedModel.includes('anime') ? 15000 : 20000; // Anime model is faster
+                let interval = maxTime / 100;
+
+                const progressInterval = setInterval(() => {
+                    progress += 1;
+                    progressFill.style.width = progress + '%';
+
+                    if (progress < 20) {
+                        progressText.innerHTML = '<span class="spinner"></span>Loading AI model...';
+                    } else if (progress < 40) {
+                        progressText.innerHTML = '<span class="spinner"></span>Analyzing image...';
+                    } else if (progress < 70) {
+                        progressText.innerHTML = '<span class="spinner"></span>AI upscaling in progress...';
+                    } else if (progress < 90) {
+                        progressText.innerHTML = '<span class="spinner"></span>Enhancing details...';
+                    } else {
+                        progressText.innerHTML = '<span class="spinner"></span>Finalizing result...';
+                    }
+
+                    if (progress >= 95) {
+                        clearInterval(progressInterval);
+                        progressText.innerHTML = '<span class="spinner"></span>Almost ready...';
+                    }
+                }, interval);
+            });
+
+            // Comparison slider functionality
+            let isDragging = false;
+            let currentZoom = 1;
+
+            function initializeComparison() {
+                const wrapper = document.getElementById('comparison-wrapper');
+                const slider = document.getElementById('comparison-slider');
+                const divider = document.getElementById('comparison-divider');
+                const enhancedOverlay = document.getElementById('enhanced-overlay');
+                const originalImg = document.getElementById('original-img');
+                const enhancedImg = document.getElementById('enhanced-img');
+
+                if (!wrapper || !slider) return;
+
+                // Normalize image sizes for comparison
+                normalizeImageSizes();
+
+                // Mouse events
+                slider.addEventListener('mousedown', startDrag);
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', stopDrag);
+
+                // Touch events for mobile
+                slider.addEventListener('touchstart', startDrag);
+                document.addEventListener('touchmove', drag);
+                document.addEventListener('touchend', stopDrag);
+
+                function startDrag(e) {
+                    isDragging = true;
+                    e.preventDefault();
+                }
+
+                function drag(e) {
+                    if (!isDragging) return;
+
+                    const rect = wrapper.getBoundingClientRect();
+                    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                    const x = clientX - rect.left;
+                    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+
+                    updateComparison(percentage);
+                }
+
+                function stopDrag() {
+                    isDragging = false;
+                }
+
+                function updateComparison(percentage) {
+                    const sliderPos = percentage + '%';
+                    const enhancedOverlay = document.getElementById('enhanced-overlay');
+
+                    // Update slider and divider position
+                    slider.style.left = sliderPos;
+                    divider.style.left = sliderPos;
+
+                    // Update clip-path: left side shows enhanced, right side shows original
+                    enhancedOverlay.style.clipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
+                }
+
+                // Initialize at 50%
+                updateComparison(50);
+            }
+
+            function resetComparison() {
+                const slider = document.getElementById('comparison-slider');
+                const divider = document.getElementById('comparison-divider');
+                const enhancedOverlay = document.getElementById('enhanced-overlay');
+
+                slider.style.left = '50%';
+                divider.style.left = '50%';
+                enhancedOverlay.style.clipPath = 'polygon(0 0, 50% 0, 50% 100%, 0 100%)';
+            }
+
+            function showOriginal() {
+                const slider = document.getElementById('comparison-slider');
+                const divider = document.getElementById('comparison-divider');
+                const enhancedOverlay = document.getElementById('enhanced-overlay');
+
+                slider.style.left = '100%';
+                divider.style.left = '100%';
+                enhancedOverlay.style.clipPath = 'polygon(0 0, 0% 0, 0% 100%, 0 100%)';
+            }
+
+            function showEnhanced() {
+                const slider = document.getElementById('comparison-slider');
+                const divider = document.getElementById('comparison-divider');
+                const enhancedOverlay = document.getElementById('enhanced-overlay');
+
+                slider.style.left = '0%';
+                divider.style.left = '0%';
+                enhancedOverlay.style.clipPath = 'polygon(0 0, 100% 0, 100% 100%, 0 100%)';
+            }
+
+            function zoomIn() {
+                currentZoom = Math.min(currentZoom * 1.2, 3);
+                updateZoom();
+            }
+
+            function zoomOut() {
+                currentZoom = Math.max(currentZoom / 1.2, 0.5);
+                updateZoom();
+            }
+
+
+            function normalizeImageSizes() {
+                const originalImg = document.getElementById('original-img');
+                const enhancedImg = document.getElementById('enhanced-img');
+
+                if (!originalImg || !enhancedImg) return;
+
+                // Wait for both images to load
+                let imagesLoaded = 0;
+                const totalImages = 2;
+
+                function onImageLoad() {
+                    imagesLoaded++;
+                    if (imagesLoaded === totalImages) {
+                        // Force both images to use the same display size by setting explicit dimensions
+                        // Get the container size
+                        const container = document.getElementById('comparison-wrapper');
+                        const containerWidth = container.clientWidth;
+                        const containerHeight = container.clientHeight;
+
+                        // Calculate how the original image would naturally display
+                        const originalNaturalWidth = originalImg.naturalWidth;
+                        const originalNaturalHeight = originalImg.naturalHeight;
+                        const originalAspectRatio = originalNaturalWidth / originalNaturalHeight;
+                        const containerAspectRatio = containerWidth / containerHeight;
+
+                        let targetWidth, targetHeight;
+
+                        if (originalAspectRatio > containerAspectRatio) {
+                            // Image is wider than container
+                            targetWidth = containerWidth;
+                            targetHeight = containerWidth / originalAspectRatio;
+                        } else {
+                            // Image is taller than container
+                            targetHeight = containerHeight;
+                            targetWidth = containerHeight * originalAspectRatio;
+                        }
+
+                        // Apply the same explicit dimensions to both images
+                        originalImg.style.width = targetWidth + 'px';
+                        originalImg.style.height = targetHeight + 'px';
+                        originalImg.style.objectFit = 'contain';
+
+                        enhancedImg.style.width = targetWidth + 'px';
+                        enhancedImg.style.height = targetHeight + 'px';
+                        enhancedImg.style.objectFit = 'contain';
+                        enhancedImg.style.transform = 'none'; // Remove any scaling
+
+                        // Store normalization scale as 1 since we're using explicit dimensions
+                        enhancedImg.dataset.normalizeScale = '1';
+
+                        // Store base dimensions for zoom functionality
+                        originalImg.dataset.baseWidth = targetWidth;
+                        originalImg.dataset.baseHeight = targetHeight;
+                        enhancedImg.dataset.baseWidth = targetWidth;
+                        enhancedImg.dataset.baseHeight = targetHeight;
+
+                        console.log('Image normalization:', {
+                            containerSize: `${containerWidth}x${containerHeight}`,
+                            targetSize: `${targetWidth}x${targetHeight}`,
+                            originalNatural: `${originalNaturalWidth}x${originalNaturalHeight}`,
+                            enhancedNatural: `${enhancedImg.naturalWidth}x${enhancedImg.naturalHeight}`
+                        });
+                    }
+                }
+
+                // Check if images are already loaded
+                if (originalImg.complete) {
+                    onImageLoad();
+                } else {
+                    originalImg.addEventListener('load', onImageLoad);
+                }
+
+                if (enhancedImg.complete) {
+                    onImageLoad();
+                } else {
+                    enhancedImg.addEventListener('load', onImageLoad);
+                }
+            }
+
+            function updateZoom() {
+                const originalImg = document.getElementById('original-img');
+                const enhancedImg = document.getElementById('enhanced-img');
+                const zoomLevel = document.getElementById('zoom-level');
+
+                if (originalImg && enhancedImg && zoomLevel) {
+                    // Get base dimensions from data attributes or calculate them
+                    let baseWidth = originalImg.dataset.baseWidth;
+                    let baseHeight = originalImg.dataset.baseHeight;
+
+                    // If base dimensions not stored, calculate and store them
+                    if (!baseWidth || !baseHeight) {
+                        const container = document.getElementById('comparison-wrapper');
+                        const containerWidth = container.clientWidth;
+                        const containerHeight = container.clientHeight;
+
+                        const originalAspectRatio = originalImg.naturalWidth / originalImg.naturalHeight;
+                        const containerAspectRatio = containerWidth / containerHeight;
+
+                        if (originalAspectRatio > containerAspectRatio) {
+                            baseWidth = containerWidth;
+                            baseHeight = containerWidth / originalAspectRatio;
+                        } else {
+                            baseHeight = containerHeight;
+                            baseWidth = containerHeight * originalAspectRatio;
+                        }
+
+                        // Store base dimensions
+                        originalImg.dataset.baseWidth = baseWidth;
+                        originalImg.dataset.baseHeight = baseHeight;
+                        enhancedImg.dataset.baseWidth = baseWidth;
+                        enhancedImg.dataset.baseHeight = baseHeight;
+                    }
+
+                    // Convert to numbers
+                    baseWidth = parseFloat(baseWidth);
+                    baseHeight = parseFloat(baseHeight);
+
+                    // Calculate zoomed dimensions
+                    const zoomedWidth = baseWidth * currentZoom;
+                    const zoomedHeight = baseHeight * currentZoom;
+
+                    // Apply dimensions to both images
+                    originalImg.style.width = zoomedWidth + 'px';
+                    originalImg.style.height = zoomedHeight + 'px';
+
+                    enhancedImg.style.width = zoomedWidth + 'px';
+                    enhancedImg.style.height = zoomedHeight + 'px';
+
+                    // Update zoom level display
+                    zoomLevel.textContent = Math.round(currentZoom * 100) + '%';
+
+                    console.log('Zoom updated:', {
+                        currentZoom: currentZoom,
+                        baseSize: `${baseWidth}x${baseHeight}`,
+                        zoomedSize: `${zoomedWidth}x${zoomedHeight}`
+                    });
+                }
+            }
+
+            // Initialize comparison when images are loaded
+            window.addEventListener('load', function() {
+                setTimeout(initializeComparison, 500);
+            });
+        </script>
+        </div>
+    </div>
+</body>
+</html>

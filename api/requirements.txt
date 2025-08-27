@@ -1,0 +1,12 @@
+flask==2.3.3
+flask-cors==4.0.0
+opencv-python==4.8.1.78
+numpy==1.24.3
+torch==2.0.1+cu118
+torchvision==0.15.2+cu118
+torchaudio==2.0.2+cu118
+basicsr==1.4.2
+facexlib==0.3.0
+gfpgan==1.3.8
+realesrgan==0.3.0
+Pillow==10.0.1
