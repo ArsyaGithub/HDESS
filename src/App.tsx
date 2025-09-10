@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import Header from './components/Header'
+import LandingPage from './components/LandingPage'
 import UploadForm from './components/UploadForm'
-import ProgressBar from './components/ProgressBar'
 import ImageComparison from './components/ImageComparison'
 import ImagePreview from './components/ImagePreview'
 import Alert from './components/Alert'
 import type { ImageProcessing } from './lib/supabase'
-import './App.css'
 
 function App() {
+  const [showLandingPage, setShowLandingPage] = useState(true)
   const [processing, setProcessing] = useState<ImageProcessing | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -34,16 +34,21 @@ function App() {
     setIsUploading(false)
   }
 
-  const handleProcessingComplete = (result: ImageProcessing) => {
-    setProcessing(result)
-    setAlert({ type: 'success', message: 'Image enhancement completed successfully!' })
+  const handleGetStarted = () => {
+    setShowLandingPage(false)
+    document.body.className = 'bg-white'
+  }
+
+  if (showLandingPage) {
+    document.body.className = 'bg-white'
+    return <LandingPage onGetStarted={handleGetStarted} />
   }
 
   return (
-    <div className="container">
+    <div className="min-h-screen bg-white text-gray-800 font-inter">
       <Header />
       
-      <div className="main-content">
+      <div className="max-w-6xl mx-auto px-5 py-15">
         {alert && (
           <Alert 
             type={alert.type} 
@@ -66,13 +71,6 @@ function App() {
           <ImageComparison 
             originalUrl={processing.original_url}
             enhancedUrl={processing.enhanced_url}
-          />
-        )}
-
-        {isUploading && (
-          <ProgressBar 
-            processing={processing}
-            onComplete={handleProcessingComplete}
           />
         )}
 

@@ -35,37 +35,18 @@ export default function Alert({ type, message, onClose, downloadUrl, originalFil
   }
 
   return (
-    <div className={`alert ${type === 'success' ? 'alert-success' : 'alert-error'}`}>
+    <div className={`p-5 rounded-xl mb-6 font-medium flex items-center gap-3 relative ${
+      type === 'success' 
+        ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-500 text-green-800' 
+        : 'bg-gradient-to-r from-red-50 to-rose-50 border border-red-500 text-red-800'
+    }`}>
       {type === 'success' ? '✅' : '❌'} {message}
       {downloadUrl && (
         <>
           <br />
           <button 
             onClick={handleDownload}
-            className="download-link"
-            style={{ 
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white',
-              border: 'none',
-              padding: '12px 24px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              marginTop: '16px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              textDecoration: 'none',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)'
-              e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)'
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = 'none'
-            }}
+            className="bg-gradient-success text-white border-none px-6 py-3 rounded-lg cursor-pointer font-semibold mt-4 inline-flex items-center gap-2 no-underline transition-all duration-200 hover:transform hover:-translate-y-0.5 hover:shadow-lg"
           >
             📥 Download Enhanced Image
           </button>
@@ -73,13 +54,7 @@ export default function Alert({ type, message, onClose, downloadUrl, originalFil
       )}
       <button 
         onClick={onClose}
-        style={{ 
-          background: 'none', 
-          border: 'none', 
-          float: 'right', 
-          cursor: 'pointer',
-          fontSize: '18px'
-        }}
+        className="bg-transparent border-none float-right cursor-pointer text-lg absolute top-4 right-4 w-6 h-6 flex items-center justify-center hover:bg-black hover:bg-opacity-10 rounded"
       >
         ×
       </button>
