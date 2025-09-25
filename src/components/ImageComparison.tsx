@@ -172,30 +172,6 @@ export default function ImageComparison({ originalUrl, enhancedUrl }: ImageCompa
             🔍+
           </button>
         </div>
-        <div className="mt-4">
-          <button 
-            className="bg-gradient-success text-white border-none px-5 py-2.5 mx-1.5 mb-2 rounded-full cursor-pointer text-sm font-semibold transition-all duration-300 shadow-sm hover:transform hover:-translate-y-0.5 hover:shadow-lg"
-            onClick={async () => {
-              try {
-                const response = await fetch(enhancedUrl)
-                const blob = await response.blob()
-                const url = window.URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = 'enhanced_image.png'
-                document.body.appendChild(a)
-                a.click()
-                document.body.removeChild(a)
-                window.URL.revokeObjectURL(url)
-              } catch (error) {
-                console.error('Download failed:', error)
-                alert('Download failed. Please try again.')
-              }
-            }}
-          >
-            📥 Download Enhanced Image
-          </button>
-        </div>
       </div>
     </div>
   )

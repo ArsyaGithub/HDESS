@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase, AI_MODELS, type ImageProcessing } from '../lib/supabase'
+import LoadingSpinner from './LoadingSpinner'
 
 interface UploadFormProps {
   onUploadStart: () => void
@@ -13,6 +14,8 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
   const [selectedModel, setSelectedModel] = useState('RealESRGAN_x4plus')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [progressMessage, setProgressMessage] = useState('Enhancing your image...')
 
   const handleFileChange = (file: File | null) => {
     setSelectedFile(file)
@@ -63,33 +66,102 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
     }
 
     onUploadStart()
+    setUploadProgress(0)
+
+    let progressInterval: NodeJS.Timeout | null = null
 
     try {
+      // Start with initial progress
+      setUploadProgress(5)
+      setProgressMessage('Preparing image for enhancement...')
+
       // Call Real-ESRGAN API first
       const formData = new FormData()
       formData.append('image', selectedFile)
       formData.append('scale', '4')
+      formData.append('model', selectedModel)
 
       const apiUrl = import.meta.env.VITE_IMAGE_PROCESSING_API_URL || 'http://localhost:8080'
-      const response = await fetch(`${apiUrl}/api/enhance`, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
+      
+      setUploadProgress(10)
+      setProgressMessage('Connecting to AI server...')
+
+      let response
+      try {
+        const token = localStorage.getItem('authToken')
+        const headers: Record<string, string> = {
           'Accept': 'application/json',
-        },
-        body: formData
-      })
+        }
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
+        setUploadProgress(15)
+        setProgressMessage('Loading AI model...')
+        
+        // Start realistic progress simulation for AI processing
+        progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            const newProgress = Math.min(prev + Math.random() * 2 + 0.5, 60)
+            
+            // Update message based on progress
+            if (newProgress < 25) {
+              setProgressMessage('Analyzing image structure...')
+            } else if (newProgress < 40) {
+              setProgressMessage('AI upscaling in progress...')
+            } else if (newProgress < 55) {
+              setProgressMessage('Enhancing details and textures...')
+            } else {
+              setProgressMessage('Applying final AI enhancements...')
+            }
+            
+            return newProgress
+          })
+        }, 600)
+        
+        response = await fetch(`${apiUrl}/api/enhance`, {
+          method: 'POST',
+          mode: 'cors',
+          headers,
+          body: formData
+        })
+      } catch (fetchError) {
+        if (progressInterval) clearInterval(progressInterval)
+        throw new Error(`Cannot connect to API server at ${apiUrl}. Please make sure the backend is running.`)
+      }
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Enhancement failed')
+        if (progressInterval) clearInterval(progressInterval)
+        let errorMessage = 'Enhancement failed'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          errorMessage = `Server error: ${response.status} ${response.statusText}`
+        }
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
       
       if (!result.success) {
+        if (progressInterval) clearInterval(progressInterval)
         throw new Error('Enhancement failed')
       }
+
+      // Clear progress interval and set to 65%
+      if (progressInterval) clearInterval(progressInterval)
+      setUploadProgress(65)
+      setProgressMessage('Processing enhanced image...')
+
+      // Generate enhanced filename with proper format
+      const fileExtension = selectedFile.name.split('.').pop() || 'jpg'
+      const fileNameWithoutExt = selectedFile.name.replace(/\.[^/.]+$/, '')
+      const enhancedDisplayName = `enhanced_${fileNameWithoutExt}.${fileExtension}`
+      
+      console.log('Original filename:', selectedFile.name)
+      console.log('Enhanced filename:', enhancedDisplayName)
 
       // Upload original image to Supabase Storage
       const originalFileName = `${Date.now()}_original_${selectedFile.name}`
@@ -102,12 +174,15 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
         throw new Error('Failed to upload original image')
       }
 
+      setUploadProgress(75)
+      setProgressMessage('Uploading enhanced image...')
+
       // Convert enhanced image from base64 to blob for upload
       const enhancedImageBase64 = result.enhanced_image
       const enhancedImageBlob = await fetch(`data:image/png;base64,${enhancedImageBase64}`).then(r => r.blob())
       
-      // Upload enhanced image to Supabase Storage
-      const enhancedFileName = `${Date.now()}_enhanced_${selectedFile.name.replace(/\.[^/.]+$/, '')}.png`
+      // Upload enhanced image to Supabase Storage (keep original extension for download)
+      const enhancedFileName = `${Date.now()}_${enhancedDisplayName}`
       const { error: enhancedUploadError } = await supabase.storage
         .from('enhanced-images')
         .upload(enhancedFileName, enhancedImageBlob)
@@ -116,6 +191,9 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
         console.error('Enhanced image upload error:', enhancedUploadError)
         throw new Error('Failed to upload enhanced image')
       }
+
+      setUploadProgress(85)
+      setProgressMessage('Generating download links...')
 
       // Get public URLs for the uploaded images
       const { data: originalUrlData } = supabase.storage
@@ -129,9 +207,12 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
       const originalUrl = originalUrlData.publicUrl
       const enhancedUrl = enhancedUrlData.publicUrl
 
+      setUploadProgress(92)
+      setProgressMessage('Saving to database...')
+
       // Save to database with storage URLs
       const processingData = {
-        original_filename: selectedFile.name,
+        original_filename: enhancedDisplayName, // Use enhanced filename for display
         original_url: originalUrl,
         enhanced_url: enhancedUrl,
         model_used: selectedModel,
@@ -150,10 +231,13 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
         // Still continue with UI update even if DB fails
       }
 
-      // Create processing data for UI
+      setUploadProgress(98)
+      setProgressMessage('Finalizing...')
+
+      // Create processing data for UI with enhanced filename
       const uiProcessingData: ImageProcessing = {
         id: dbRecord?.id || Date.now().toString(),
-        original_filename: selectedFile.name,
+        original_filename: enhancedDisplayName, // Use enhanced filename for display
         original_url: originalUrl,
         enhanced_url: enhancedUrl,
         model_used: selectedModel,
@@ -163,15 +247,26 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
         updated_at: dbRecord?.updated_at || new Date().toISOString()
       }
 
-      onUploadComplete(uiProcessingData)
+      setUploadProgress(100)
+      setProgressMessage('Enhancement completed!')
 
-      // Reset form
-      setSelectedFile(null)
-      const fileInput = document.getElementById('file') as HTMLInputElement
-      if (fileInput) fileInput.value = ''
+      // Small delay to show 100% before completing
+      setTimeout(() => {
+        onUploadComplete(uiProcessingData)
+        
+        // Reset form
+        setSelectedFile(null)
+        setUploadProgress(0)
+        setProgressMessage('Enhancing your image...')
+        const fileInput = document.getElementById('file') as HTMLInputElement
+        if (fileInput) fileInput.value = ''
+      }, 500)
 
     } catch (error) {
       console.error('Upload error:', error)
+      if (progressInterval) clearInterval(progressInterval)
+      setUploadProgress(0)
+      setProgressMessage('Enhancing your image...')
       onUploadError(error instanceof Error ? error.message : 'Enhancement failed')
     }
   }
@@ -183,6 +278,19 @@ export default function UploadForm({ onUploadStart, onUploadComplete, onUploadEr
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  if (disabled) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl mx-auto">
+        <LoadingSpinner 
+          size="lg" 
+          message={progressMessage} 
+          progress={uploadProgress}
+          showProgress={true}
+        />
+      </div>
+    )
   }
 
   return (

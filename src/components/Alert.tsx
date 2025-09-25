@@ -4,9 +4,10 @@ interface AlertProps {
   onClose: () => void
   downloadUrl?: string
   originalFilename?: string
+  onDownloadComplete?: () => void
 }
 
-export default function Alert({ type, message, onClose, downloadUrl, originalFilename }: AlertProps) {
+export default function Alert({ type, message, onClose, downloadUrl, originalFilename, onDownloadComplete }: AlertProps) {
   const handleDownload = async () => {
     if (!downloadUrl) return
 
@@ -14,10 +15,9 @@ export default function Alert({ type, message, onClose, downloadUrl, originalFil
       const response = await fetch(downloadUrl)
       const blob = await response.blob()
       
-      // Create download filename
-      const filename = originalFilename 
-        ? `enhanced_${originalFilename.replace(/\.[^/.]+$/, '')}.png`
-        : 'enhanced_image.png'
+      // Use the filename as is (already in enhanced_filename.ext format)
+      const filename = originalFilename || 'enhanced_image.png'
+      console.log('Download filename:', filename)
       
       // Create download link
       const url = window.URL.createObjectURL(blob)
@@ -28,6 +28,16 @@ export default function Alert({ type, message, onClose, downloadUrl, originalFil
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
+      
+      // Call callback and navigate back to upload form after download
+      setTimeout(() => {
+        if (onDownloadComplete) {
+          onDownloadComplete()
+        } else {
+          window.location.href = '/app'
+        }
+      }, 1000) // Small delay to ensure download starts
+      
     } catch (error) {
       console.error('Download failed:', error)
       alert('Download failed. Please try again.')

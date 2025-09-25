@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Flask API for Real-ESRGAN Image Enhancement
+Optimized version with caching, rate limiting, and security enhancements
 """
 
 import os
@@ -9,12 +10,35 @@ import cv2
 import base64
 import numpy as np
 import torch
+import redis
+# import magic  # Commented out due to Windows compatibility issues
+import psutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
 import tempfile
 import uuid
 from datetime import datetime
+import logging
+from functools import lru_cache
+import hashlib
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('api.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Add Real-ESRGAN path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'REAL-ESRGAN'))
@@ -24,13 +48,37 @@ from realesrgan import RealESRGANer
 from realesrgan.archs.srvgg_arch import SRVGGNetCompact
 
 app = Flask(__name__)
-# Simple CORS configuration
-CORS(app)
+
+# Enhanced CORS configuration
+CORS(app, origins=os.getenv('ALLOWED_ORIGINS', '*').split(','))
+
+# Redis configuration
+try:
+    redis_client = redis.Redis(
+        host=os.getenv('REDIS_HOST', 'localhost'),
+        port=int(os.getenv('REDIS_PORT', 6379)),
+        db=0,
+        decode_responses=True
+    )
+    redis_client.ping()
+    logger.info("✅ Redis connected successfully")
+except Exception as e:
+    logger.warning(f"⚠️ Redis not available: {e}")
+    redis_client = None
+
+# Rate limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}" if redis_client else "memory://"
+)
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # Create directories
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -161,6 +209,7 @@ def base64_to_image(base64_string, output_path):
         f.write(image_data)
 
 @app.route('/api/health', methods=['GET'])
+@limiter.limit("10 per minute")
 def health_check():
     """Health check endpoint"""
     return jsonify({
@@ -173,6 +222,7 @@ def health_check():
 
 @app.route('/api/enhance', methods=['POST'])
 @cross_origin()
+@limiter.limit("5 per minute")
 def enhance_image():
     """Enhance image using Real-ESRGAN"""
     global models, current_model
@@ -191,8 +241,9 @@ def enhance_image():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type'}), 400
+        is_valid, message = validate_image_file(file)
+        if not is_valid:
+            return jsonify({'error': message}), 400
         
         # Get enhancement parameters
         requested_model = request.form.get('model', current_model)
@@ -254,6 +305,7 @@ def enhance_image():
         return jsonify({'error': f'Enhancement failed: {str(e)}'}), 500
 
 @app.route('/api/models', methods=['GET'])
+@limiter.limit("10 per minute")
 def get_models():
     """Get available models"""
     available_models = []
@@ -274,6 +326,7 @@ def get_models():
 
 @app.route('/api/switch-model', methods=['POST'])
 @cross_origin()
+@limiter.limit("5 per minute")
 def switch_model():
     """Switch to a different model"""
     data = request.get_json()
